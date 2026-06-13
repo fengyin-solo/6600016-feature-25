@@ -19,9 +19,10 @@ export const useMorseStore = defineStore('morse', () => {
   const userAnswer = ref('')
   const score = ref({ correct: 0, total: 0 })
   const isPlaying = ref(false)
+  const wrongCharsQueue = ref<string[]>([])
+  const isPracticingWrong = ref(false)
   let audioCtx: AudioContext | null = null
   let currentOscillator: OscillatorNode | null = null
-  let wrongCharsQueue: string[] = []
 
   const dotDuration = computed(() => 1200 / wpm.value)
 
@@ -38,7 +39,10 @@ export const useMorseStore = defineStore('morse', () => {
     return [...new Set(history.value.filter(h => !h.correct).map(h => h.input))]
   })
 
-  const wrongCharsRemaining = computed(() => wrongCharsQueue.length)
+  const wrongCharsRemaining = computed(() => {
+    if (!isPracticingWrong.value) return 0
+    return wrongCharsQueue.value.length + (quizChar.value ? 1 : 0)
+  })
 
   function getAudioCtx(): AudioContext {
     if (!audioCtx) audioCtx = new AudioContext()
@@ -54,7 +58,7 @@ export const useMorseStore = defineStore('morse', () => {
       osc.frequency.value = frequency.value
       gain.gain.value = volume.value
       osc.connect(gain)
-      gain.connect(ctx.destination)
+      gain.connect(ctx.direction)
       osc.start()
       currentOscillator = osc
       setTimeout(() => { osc.stop(); currentOscillator = null; resolve() }, duration)
@@ -88,6 +92,12 @@ export const useMorseStore = defineStore('morse', () => {
   }
 
   function generateQuiz() {
+    if (wrongCharsQueue.value.length > 0) {
+      quizChar.value = wrongCharsQueue.value.shift() || ''
+      userAnswer.value = ''
+      return
+    }
+    isPracticingWrong.value = false
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     quizChar.value = chars[Math.floor(Math.random() * chars.length)]
     userAnswer.value = ''
@@ -107,7 +117,8 @@ export const useMorseStore = defineStore('morse', () => {
   function resetScore() {
     score.value = { correct: 0, total: 0 }
     history.value = []
-    wrongCharsQueue = []
+    wrongCharsQueue.value = []
+    isPracticingWrong.value = false
   }
 
   function setHistoryFilter(filter: HistoryFilter) {
@@ -115,39 +126,17 @@ export const useMorseStore = defineStore('morse', () => {
   }
 
   function practiceWrongChars() {
-    wrongCharsQueue = [...wrongChars.value]
-    if (wrongCharsQueue.length > 0) {
-      quizChar.value = wrongCharsQueue.shift() || ''
-      userAnswer.value = ''
+    wrongCharsQueue.value = [...wrongChars.value]
+    if (wrongCharsQueue.value.length > 0) {
+      isPracticingWrong.value = true
+      generateQuiz()
     }
-  }
-
-  function generateQuiz() {
-    if (wrongCharsQueue.length > 0) {
-      quizChar.value = wrongCharsQueue.shift() || ''
-      userAnswer.value = ''
-      return
-    }
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    quizChar.value = chars[Math.floor(Math.random() * chars.length)]
-    userAnswer.value = ''
-  }
-
-  function checkAnswer() {
-    const correct = userAnswer.value.trim() === MORSE_TABLE[quizChar.value]
-    score.value.total++
-    if (correct) score.value.correct++
-    history.value.unshift({
-      id: Date.now(), input: quizChar.value, output: userAnswer.value,
-      correct, timestamp: Date.now()
-    })
-    generateQuiz()
   }
 
   return {
     inputText, morseOutput, decodedText, wpm, frequency, volume,
     trainMode, history, historyFilter, filteredHistory, wrongChars, wrongCharsRemaining,
-    quizChar, userAnswer, score, isPlaying,
+    isPracticingWrong, quizChar, userAnswer, score, isPlaying,
     dotDuration, encode, decode, playMorse, playTone,
     generateQuiz, checkAnswer, resetScore, setHistoryFilter, practiceWrongChars
   }

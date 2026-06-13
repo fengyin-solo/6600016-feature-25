@@ -9,6 +9,9 @@
         </button>
       </div>
       <div v-else class="flex flex-col items-center gap-4">
+        <div v-if="store.wrongCharsRemaining > 0" class="text-sm text-blue-400">
+          错题重练中 - 剩余 {{ store.wrongCharsRemaining }} 题
+        </div>
         <div class="text-8xl font-bold text-amber-400">{{ store.quizChar }}</div>
         <button @click="store.playMorse(MORSE_TABLE[store.quizChar])" :disabled="store.isPlaying"
           class="bg-green-600 px-4 py-2 rounded hover:bg-green-500 disabled:opacity-50">
@@ -27,7 +30,14 @@
     <div class="bg-gray-900 rounded-xl p-4 flex flex-col gap-3">
       <div class="flex justify-between items-center">
         <h3 class="text-amber-300 font-bold">训练统计</h3>
-        <button @click="store.resetScore()" class="text-red-400 text-sm hover:underline">重置</button>
+        <div class="flex gap-2">
+          <button @click="store.practiceWrongChars()"
+            :disabled="store.wrongChars.length === 0"
+            class="text-blue-400 text-sm hover:underline disabled:opacity-50 disabled:cursor-not-allowed">
+            重练错题 ({{ store.wrongChars.length }})
+          </button>
+          <button @click="store.resetScore()" class="text-red-400 text-sm hover:underline">重置</button>
+        </div>
       </div>
       <div class="grid grid-cols-3 gap-2 text-center">
         <div class="bg-gray-800 rounded p-2">
@@ -45,8 +55,18 @@
           <div class="text-xs text-gray-400">正确率</div>
         </div>
       </div>
+      <div class="flex gap-1">
+        <button v-for="f in filters" :key="f.value" @click="store.setHistoryFilter(f.value)"
+          class="flex-1 py-1 text-xs rounded transition-colors"
+          :class="store.historyFilter === f.value ? 'bg-amber-500 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'">
+          {{ f.label }}
+        </button>
+      </div>
       <div class="flex-1 overflow-y-auto max-h-64">
-        <div v-for="h in store.history.slice(0, 20)" :key="h.id"
+        <div v-if="store.filteredHistory.length === 0" class="text-center text-gray-500 py-4">
+          暂无记录
+        </div>
+        <div v-for="h in store.filteredHistory.slice(0, 20)" :key="h.id"
           class="flex justify-between bg-gray-800 rounded p-2 mb-1 text-sm"
           :class="h.correct ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'">
           <span>{{ h.input }} → {{ h.output }}</span>
@@ -58,8 +78,14 @@
 </template>
 
 <script setup lang="ts">
-import { useMorseStore } from '../store/morse'
+import { useMorseStore, type HistoryFilter } from '../store/morse'
 import { MORSE_TABLE } from '../utils/morse-code'
 
 const store = useMorseStore()
+
+const filters: { label: string; value: HistoryFilter }[] = [
+  { label: '全部', value: 'all' },
+  { label: '正确', value: 'correct' },
+  { label: '错误', value: 'wrong' },
+]
 </script>
